@@ -1,5 +1,5 @@
 require("dotenv").config();
-
+const askCommand = require("./commands/ask");
 const db = require("./database");
 const newMovieCommand = require("./commands/newmovie");
 const {
@@ -57,6 +57,10 @@ client.commands.set(
 client.commands.set(
     newMovieCommand.data.name,
     newMovieCommand
+);
+client.commands.set(
+    askCommand.data.name,
+    askCommand
 );
 client.showLibraryHome = showLibraryHome;
 
