@@ -9,13 +9,17 @@ const { REST, Routes } = require("discord.js");
 const movieCommand = require("./commands/movie");
 const libraryCommand = require("./commands/library");
 const newMovieCommand = require("./commands/newmovie");
+const askCommand = require("./commands/ask");
 
 const commands = [
     movieCommand.data.toJSON(),
     libraryCommand.data.toJSON(),
 
-     newMovieCommand.data.toJSON()
+     newMovieCommand.data.toJSON(),
+         askCommand.data.toJSON()
 ];
+
+
 
 const rest = new REST({ version: "10" }).setToken(
     process.env.DISCORD_TOKEN
