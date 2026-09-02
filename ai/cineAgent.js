@@ -1,38 +1,71 @@
-const ollama = require("ollama");
-
 async function askCineAgent(userMessage) {
-    const response = await ollama.chat({
-        model: "gemma3:4b",
+    try {
+        console.log("🤖 Sending request to Ollama...");
+        console.log("Question:", userMessage);
 
-        messages: [
-            {
-                role: "system",
-                content: `
-You are CineTrack AI, an intelligent movie assistant inside Discord.
+        const response = await fetch("http://localhost:11434/api/chat", {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json"
+            },
+            body: JSON.stringify({
+                model: "gemma3:4b",
+
+                messages: [
+                    {
+                        role: "system",
+                        content: `
+You are CineTrack AI, an intelligent movie assistant inside a Discord bot.
 
 You help users with:
 - Movies
 - TV series
 - Movie recommendations
+- Movie discovery
 - Watchlists
 - Watched movies
-- Ratings
-- Movie discovery
+- Movie ratings
 
-Be helpful and concise.
+Be friendly, concise and useful.
 
-At this stage, you are only answering questions.
 Do not invent movie information.
+If you are unsure about something, say that you are unsure.
 `
-            },
-            {
-                role: "user",
-                content: userMessage
-            }
-        ]
-    });
+                    },
+                    {
+                        role: "user",
+                        content: userMessage
+                    }
+                ],
 
-    return response.message.content;
+                stream: false
+            })
+        });
+
+        console.log("Ollama HTTP status:", response.status);
+
+        if (!response.ok) {
+            const errorText = await response.text();
+
+            console.error("❌ Ollama error:");
+            console.error(errorText);
+
+            throw new Error(
+                `Ollama returned HTTP ${response.status}`
+            );
+        }
+
+        const data = await response.json();
+
+        console.log("✅ Ollama response received.");
+
+        return data.message?.content ||
+            "❌ CineTrack AI did not return an answer.";
+
+    } catch (error) {
+        console.error("❌ CineTrack AI error:", error);
+        throw error;
+    }
 }
 
 module.exports = {

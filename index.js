@@ -1,11 +1,15 @@
 require("dotenv").config();
-const askCommand = require("./commands/ask");
+
 const db = require("./database");
+
+const movieCommand = require("./commands/movie");
+const libraryCommand = require("./commands/library");
 const newMovieCommand = require("./commands/newmovie");
+const askCommand = require("./commands/ask");
+
 const {
     startNewMovieDrops
 } = require("./newMovieDrops");
-
 
 const {
     Client,
@@ -21,9 +25,6 @@ const {
 } = require("discord.js");
 
 const axios = require("axios");
-
-const movieCommand = require("./commands/movie");
-const libraryCommand = require("./commands/library");
 
 
 // ==========================================
@@ -45,24 +46,22 @@ client.commands.set(
     movieCommand.data.name,
     movieCommand
 );
+
+client.commands.set(
+    libraryCommand.data.name,
+    libraryCommand
+);
+
 client.commands.set(
     newMovieCommand.data.name,
     newMovieCommand
 );
 
 client.commands.set(
-    libraryCommand.data.name,
-    libraryCommand
-);
-client.commands.set(
-    newMovieCommand.data.name,
-    newMovieCommand
-);
-client.commands.set(
     askCommand.data.name,
     askCommand
 );
-client.showLibraryHome = showLibraryHome;
+
 
 // ==========================================
 // BOT READY
@@ -77,7 +76,8 @@ client.once("clientReady", async () => {
         await db.query("SELECT 1");
 
         console.log("✅ MySQL connected!");
- // Start automatic movie drops
+
+        // Start automatic movie drops
         startNewMovieDrops(client);
 
     } catch (error) {
@@ -88,7 +88,6 @@ client.once("clientReady", async () => {
         );
 
     }
-    
 
 });
 
@@ -98,7 +97,6 @@ client.once("clientReady", async () => {
 // ==========================================
 
 client.on("interactionCreate", async (interaction) => {
-
 
     // ==========================================
     // SLASH COMMANDS
@@ -117,24 +115,38 @@ client.on("interactionCreate", async (interaction) => {
 
         } catch (error) {
 
-            console.error("Command error:", error);
+            console.error(
+                `❌ Error in /${interaction.commandName}:`,
+                error
+            );
 
-            if (
-                interaction.replied ||
-                interaction.deferred
-            ) {
+            try {
 
-                await interaction.followUp({
-                    content: "❌ Something went wrong.",
-                    ephemeral: true
-                });
+                if (
+                    interaction.replied ||
+                    interaction.deferred
+                ) {
 
-            } else {
+                    await interaction.followUp({
+                        content: "❌ Something went wrong.",
+                        ephemeral: true
+                    });
 
-                await interaction.reply({
-                    content: "❌ Something went wrong.",
-                    ephemeral: true
-                });
+                } else {
+
+                    await interaction.reply({
+                        content: "❌ Something went wrong.",
+                        ephemeral: true
+                    });
+
+                }
+
+            } catch (replyError) {
+
+                console.error(
+                    "❌ Could not send error message:",
+                    replyError
+                );
 
             }
 
@@ -171,6 +183,7 @@ client.on("interactionCreate", async (interaction) => {
             const movieId =
                 await getOrCreateMovie(imdbId);
 
+            // Add to watched
             await db.query(
                 `
                 INSERT IGNORE INTO watched
@@ -188,27 +201,33 @@ client.on("interactionCreate", async (interaction) => {
                 ]
             );
 
-            const [rows] = await db.query(
-                `
-                SELECT title
-                FROM movies
-                WHERE id = ?
-                `,
-                [movieId]
-            );
+            // Get movie title
+            const [rows] =
+                await db.query(
+                    `
+                    SELECT title
+                    FROM movies
+                    WHERE id = ?
+                    `,
+                    [movieId]
+                );
 
             const title =
                 rows[0]?.title || "this movie";
 
             await interaction.editReply(
-                `☑️ **${interaction.user.username}** marked **${title}** as **Watched**!`
+                `☑️ **${title}** marked as **Watched**!`
             );
 
         } catch (error) {
 
-            console.error("Watched error:", error);
+            console.error(
+                "❌ Watched error:",
+                error
+            );
 
-            await interaction.editReply(
+            await safeEditReply(
+                interaction,
                 "❌ Couldn't save watched status."
             );
 
@@ -234,6 +253,7 @@ client.on("interactionCreate", async (interaction) => {
             const movieId =
                 await getOrCreateMovie(imdbId);
 
+            // Add movie to THIS USER'S bucket
             await db.query(
                 `
                 INSERT IGNORE INTO bucket_list
@@ -251,27 +271,33 @@ client.on("interactionCreate", async (interaction) => {
                 ]
             );
 
-            const [rows] = await db.query(
-                `
-                SELECT title
-                FROM movies
-                WHERE id = ?
-                `,
-                [movieId]
-            );
+            // Get movie title
+            const [rows] =
+                await db.query(
+                    `
+                    SELECT title
+                    FROM movies
+                    WHERE id = ?
+                    `,
+                    [movieId]
+                );
 
             const title =
                 rows[0]?.title || "this movie";
 
             await interaction.editReply(
-                `📌 **${interaction.user.username}** added **${title}** to the **Bucket List**!`
+                `📌 **${title}** was added to your **Bucket List**!`
             );
 
         } catch (error) {
 
-            console.error("Bucket error:", error);
+            console.error(
+                "❌ Bucket error:",
+                error
+            );
 
-            await interaction.editReply(
+            await safeEditReply(
+                interaction,
                 "❌ Couldn't add the movie to your Bucket List."
             );
 
@@ -297,6 +323,7 @@ client.on("interactionCreate", async (interaction) => {
             const movieId =
                 await getOrCreateMovie(imdbId);
 
+            // Suggestions are SERVER-WIDE
             await db.query(
                 `
                 INSERT INTO suggestions
@@ -314,27 +341,32 @@ client.on("interactionCreate", async (interaction) => {
                 ]
             );
 
-            const [rows] = await db.query(
-                `
-                SELECT title
-                FROM movies
-                WHERE id = ?
-                `,
-                [movieId]
-            );
+            const [rows] =
+                await db.query(
+                    `
+                    SELECT title
+                    FROM movies
+                    WHERE id = ?
+                    `,
+                    [movieId]
+                );
 
             const title =
                 rows[0]?.title || "this movie";
 
             await interaction.editReply(
-                `💡 **${interaction.user.username}** suggested **${title}**!\n\n👤 Suggested by: **${interaction.user.username}**`
+                `💡 **${title}** has been suggested by **${interaction.user.username}**!`
             );
 
         } catch (error) {
 
-            console.error("Suggestion error:", error);
+            console.error(
+                "❌ Suggestion error:",
+                error
+            );
 
-            await interaction.editReply(
+            await safeEditReply(
+                interaction,
                 "❌ Couldn't save the suggestion."
             );
 
@@ -355,7 +387,9 @@ client.on("interactionCreate", async (interaction) => {
 
         const modal =
             new ModalBuilder()
-                .setCustomId(`ratingModal_${imdbId}`)
+                .setCustomId(
+                    `ratingModal_${imdbId}`
+                )
                 .setTitle("Rate this movie");
 
 
@@ -367,7 +401,7 @@ client.on("interactionCreate", async (interaction) => {
                 .setStyle(TextInputStyle.Short)
                 .setRequired(true)
                 .setMinLength(1)
-                .setMaxLength(3);
+                .setMaxLength(4);
 
 
         const row =
@@ -384,7 +418,7 @@ client.on("interactionCreate", async (interaction) => {
 
 
     // ==========================================
-    // LIBRARY BUTTONS
+    // LIBRARY - BUCKET
     // ==========================================
 
     if (customId === "library_bucket") {
@@ -395,6 +429,10 @@ client.on("interactionCreate", async (interaction) => {
     }
 
 
+    // ==========================================
+    // LIBRARY - WATCHED
+    // ==========================================
+
     if (customId === "library_watched") {
 
         await showWatchedList(interaction);
@@ -402,6 +440,10 @@ client.on("interactionCreate", async (interaction) => {
         return;
     }
 
+
+    // ==========================================
+    // LIBRARY - NOT WATCHED
+    // ==========================================
 
     if (customId === "library_unwatched") {
 
@@ -411,6 +453,10 @@ client.on("interactionCreate", async (interaction) => {
     }
 
 
+    // ==========================================
+    // LIBRARY - SUGGESTIONS
+    // ==========================================
+
     if (customId === "library_suggestions") {
 
         await showSuggestions(interaction);
@@ -419,6 +465,10 @@ client.on("interactionCreate", async (interaction) => {
     }
 
 
+    // ==========================================
+    // LIBRARY - RATINGS
+    // ==========================================
+
     if (customId === "library_ratings") {
 
         await showRatings(interaction);
@@ -426,6 +476,10 @@ client.on("interactionCreate", async (interaction) => {
         return;
     }
 
+
+    // ==========================================
+    // LIBRARY - BACK
+    // ==========================================
 
     if (customId === "library_back") {
 
@@ -446,11 +500,12 @@ client.on("interactionCreate", async (interaction) => {
     if (!interaction.isModalSubmit()) return;
 
     if (
-        !interaction.customId.startsWith("ratingModal_")
+        !interaction.customId.startsWith(
+            "ratingModal_"
+        )
     ) {
         return;
     }
-
 
     const imdbId =
         interaction.customId.replace(
@@ -458,13 +513,17 @@ client.on("interactionCreate", async (interaction) => {
             ""
         );
 
-
     const ratingText =
-        interaction.fields.getTextInputValue("rating");
+        interaction.fields.getTextInputValue(
+            "rating"
+        );
 
     const rating =
         Number(ratingText);
 
+    // ==========================================
+    // VALIDATE RATING
+    // ==========================================
 
     if (
         Number.isNaN(rating) ||
@@ -480,38 +539,44 @@ client.on("interactionCreate", async (interaction) => {
 
     }
 
-
     try {
 
         await interaction.deferReply();
-
 
         const movieId =
             await getOrCreateMovie(imdbId);
 
 
-        // Check if user already rated this movie
+        // ==========================================
+        // CHECK EXISTING RATING
+        // ==========================================
 
-        const [existing] = await db.query(
-            `
-            SELECT id
-            FROM ratings
-            WHERE user_id = ?
-            AND movie_id = ?
-            `,
-            [
-                interaction.user.id,
-                movieId
-            ]
-        );
+        const [existing] =
+            await db.query(
+                `
+                SELECT id
+                FROM ratings
+                WHERE user_id = ?
+                AND movie_id = ?
+                `,
+                [
+                    interaction.user.id,
+                    movieId
+                ]
+            );
 
+
+        // ==========================================
+        // UPDATE EXISTING
+        // ==========================================
 
         if (existing.length > 0) {
 
             await db.query(
                 `
                 UPDATE ratings
-                SET rating = ?,
+                SET
+                    rating = ?,
                     username = ?,
                     rated_at = CURRENT_TIMESTAMP
                 WHERE user_id = ?
@@ -525,7 +590,13 @@ client.on("interactionCreate", async (interaction) => {
                 ]
             );
 
-        } else {
+        }
+
+        // ==========================================
+        // INSERT NEW
+        // ==========================================
+
+        else {
 
             await db.query(
                 `
@@ -549,30 +620,37 @@ client.on("interactionCreate", async (interaction) => {
         }
 
 
-        const [rows] = await db.query(
-            `
-            SELECT title
-            FROM movies
-            WHERE id = ?
-            `,
-            [movieId]
-        );
+        // ==========================================
+        // GET MOVIE NAME
+        // ==========================================
 
+        const [rows] =
+            await db.query(
+                `
+                SELECT title
+                FROM movies
+                WHERE id = ?
+                `,
+                [movieId]
+            );
 
         const title =
             rows[0]?.title || "the movie";
 
 
         await interaction.editReply(
-            `⭐ **${interaction.user.username}** rated **${title}** **${rating}/10**!`
+            `⭐ You rated **${title}** **${rating}/10**!`
         );
-
 
     } catch (error) {
 
-        console.error("Rating error:", error);
+        console.error(
+            "❌ Rating error:",
+            error
+        );
 
-        await interaction.editReply(
+        await safeEditReply(
+            interaction,
             "❌ Couldn't save your rating."
         );
 
@@ -591,37 +669,49 @@ async function showLibraryHome(interaction) {
         new EmbedBuilder()
             .setTitle("🎬 CineTrack Library")
             .setDescription(
-                "Choose what you want to see:"
+                `Welcome **${interaction.user.username}**!\n\nChoose what you want to see:`
             )
             .addFields(
+
                 {
                     name: "📌 Bucket List",
-                    value: "Movies you want to watch.",
+                    value:
+                        "Movies you want to watch.",
                     inline: true
                 },
+
                 {
                     name: "☑️ Watched",
-                    value: "Movies you have watched.",
+                    value:
+                        "Movies you have watched.",
                     inline: true
                 },
+
                 {
                     name: "⏳ Not Watched",
-                    value: "Bucket movies still waiting.",
+                    value:
+                        "Bucket movies still waiting.",
                     inline: true
                 },
+
                 {
                     name: "💡 Suggestions",
-                    value: "Movies suggested by users.",
+                    value:
+                        "Movies suggested by members.",
                     inline: true
                 },
+
                 {
                     name: "⭐ My Ratings",
-                    value: "Movies you have rated.",
+                    value:
+                        "Movies you have rated.",
                     inline: true
                 }
+
             )
             .setFooter({
-                text: "CineTrack • Your personal movie library"
+                text:
+                    "CineTrack • Your personal movie library"
             });
 
 
@@ -633,19 +723,25 @@ async function showLibraryHome(interaction) {
                     .setCustomId("library_bucket")
                     .setLabel("Bucket List")
                     .setEmoji("📌")
-                    .setStyle(ButtonStyle.Primary),
+                    .setStyle(
+                        ButtonStyle.Primary
+                    ),
 
                 new ButtonBuilder()
                     .setCustomId("library_watched")
                     .setLabel("Watched")
                     .setEmoji("☑️")
-                    .setStyle(ButtonStyle.Success),
+                    .setStyle(
+                        ButtonStyle.Success
+                    ),
 
                 new ButtonBuilder()
                     .setCustomId("library_unwatched")
                     .setLabel("Not Watched")
                     .setEmoji("⏳")
-                    .setStyle(ButtonStyle.Secondary)
+                    .setStyle(
+                        ButtonStyle.Secondary
+                    )
 
             );
 
@@ -655,35 +751,35 @@ async function showLibraryHome(interaction) {
             .addComponents(
 
                 new ButtonBuilder()
-                    .setCustomId("library_suggestions")
+                    .setCustomId(
+                        "library_suggestions"
+                    )
                     .setLabel("Suggestions")
                     .setEmoji("💡")
-                    .setStyle(ButtonStyle.Primary),
+                    .setStyle(
+                        ButtonStyle.Primary
+                    ),
 
                 new ButtonBuilder()
-                    .setCustomId("library_ratings")
+                    .setCustomId(
+                        "library_ratings"
+                    )
                     .setLabel("My Ratings")
                     .setEmoji("⭐")
-                    .setStyle(ButtonStyle.Secondary)
+                    .setStyle(
+                        ButtonStyle.Secondary
+                    )
 
             );
 
 
-    if (interaction.deferred || interaction.replied) {
-
-        await interaction.editReply({
+    await sendOrEdit(
+        interaction,
+        {
             embeds: [embed],
             components: [row1, row2]
-        });
-
-    } else {
-
-        await interaction.reply({
-            embeds: [embed],
-            components: [row1, row2]
-        });
-
-    }
+        }
+    );
 
 }
 
@@ -698,7 +794,6 @@ async function showBucketList(interaction) {
 
         await interaction.deferReply();
 
-
         const [movies] =
             await db.query(
                 `
@@ -708,19 +803,24 @@ async function showBucketList(interaction) {
                     m.poster,
                     m.imdb_rating
                 FROM bucket_list b
+
                 JOIN movies m
                     ON b.movie_id = m.id
+
                 WHERE b.user_id = ?
+
                 ORDER BY b.added_at DESC
                 `,
-                [interaction.user.id]
+                [
+                    interaction.user.id
+                ]
             );
 
 
         if (movies.length === 0) {
 
             return interaction.editReply(
-                "📌 **Your Bucket List is empty.**"
+                "📌 **Your Bucket List is empty.**\n\nUse `/movie` and press **📌 Bucket**."
             );
 
         }
@@ -741,7 +841,9 @@ async function showBucketList(interaction) {
 
         const embed =
             new EmbedBuilder()
-                .setTitle("📌 My Bucket List")
+                .setTitle(
+                    `📌 ${interaction.user.username}'s Bucket List`
+                )
                 .setDescription(description)
                 .setFooter({
                     text:
@@ -751,18 +853,20 @@ async function showBucketList(interaction) {
 
         await interaction.editReply({
             embeds: [embed],
-            components: [libraryBackButton()]
+            components: [
+                libraryBackButton()
+            ]
         });
-
 
     } catch (error) {
 
         console.error(
-            "Bucket list error:",
+            "❌ Bucket list error:",
             error
         );
 
-        await interaction.editReply(
+        await safeEditReply(
+            interaction,
             "❌ Couldn't load your Bucket List."
         );
 
@@ -781,7 +885,6 @@ async function showWatchedList(interaction) {
 
         await interaction.deferReply();
 
-
         const [movies] =
             await db.query(
                 `
@@ -791,13 +894,19 @@ async function showWatchedList(interaction) {
                     m.poster,
                     m.imdb_rating,
                     w.watched_at
+
                 FROM watched w
+
                 JOIN movies m
                     ON w.movie_id = m.id
+
                 WHERE w.user_id = ?
+
                 ORDER BY w.watched_at DESC
                 `,
-                [interaction.user.id]
+                [
+                    interaction.user.id
+                ]
             );
 
 
@@ -826,7 +935,9 @@ async function showWatchedList(interaction) {
 
         const embed =
             new EmbedBuilder()
-                .setTitle("☑️ Movies I Watched")
+                .setTitle(
+                    `☑️ ${interaction.user.username}'s Watched Movies`
+                )
                 .setDescription(description)
                 .setFooter({
                     text:
@@ -836,18 +947,20 @@ async function showWatchedList(interaction) {
 
         await interaction.editReply({
             embeds: [embed],
-            components: [libraryBackButton()]
+            components: [
+                libraryBackButton()
+            ]
         });
-
 
     } catch (error) {
 
         console.error(
-            "Watched list error:",
+            "❌ Watched list error:",
             error
         );
 
-        await interaction.editReply(
+        await safeEditReply(
+            interaction,
             "❌ Couldn't load watched movies."
         );
 
@@ -866,7 +979,6 @@ async function showNotWatchedList(interaction) {
 
         await interaction.deferReply();
 
-
         const [movies] =
             await db.query(
                 `
@@ -875,17 +987,25 @@ async function showNotWatchedList(interaction) {
                     m.year,
                     m.poster,
                     m.imdb_rating
+
                 FROM bucket_list b
+
                 JOIN movies m
                     ON b.movie_id = m.id
+
                 LEFT JOIN watched w
                     ON w.movie_id = m.id
                     AND w.user_id = b.user_id
+
                 WHERE b.user_id = ?
+
                 AND w.id IS NULL
+
                 ORDER BY b.added_at DESC
                 `,
-                [interaction.user.id]
+                [
+                    interaction.user.id
+                ]
             );
 
 
@@ -914,7 +1034,9 @@ async function showNotWatchedList(interaction) {
 
         const embed =
             new EmbedBuilder()
-                .setTitle("⏳ Still To Watch")
+                .setTitle(
+                    `⏳ ${interaction.user.username}'s To Watch`
+                )
                 .setDescription(description)
                 .setFooter({
                     text:
@@ -924,18 +1046,20 @@ async function showNotWatchedList(interaction) {
 
         await interaction.editReply({
             embeds: [embed],
-            components: [libraryBackButton()]
+            components: [
+                libraryBackButton()
+            ]
         });
-
 
     } catch (error) {
 
         console.error(
-            "Not watched error:",
+            "❌ Not watched error:",
             error
         );
 
-        await interaction.editReply(
+        await safeEditReply(
+            interaction,
             "❌ Couldn't load unwatched movies."
         );
 
@@ -954,7 +1078,6 @@ async function showSuggestions(interaction) {
 
         await interaction.deferReply();
 
-
         const [movies] =
             await db.query(
                 `
@@ -965,9 +1088,12 @@ async function showSuggestions(interaction) {
                     m.imdb_rating,
                     s.username,
                     s.suggested_at
+
                 FROM suggestions s
+
                 JOIN movies m
                     ON s.movie_id = m.id
+
                 ORDER BY s.suggested_at DESC
                 `
             );
@@ -998,7 +1124,7 @@ async function showSuggestions(interaction) {
 
         const embed =
             new EmbedBuilder()
-                .setTitle("💡 Movie Suggestions")
+                .setTitle("💡 Community Movie Suggestions")
                 .setDescription(description)
                 .setFooter({
                     text:
@@ -1008,18 +1134,20 @@ async function showSuggestions(interaction) {
 
         await interaction.editReply({
             embeds: [embed],
-            components: [libraryBackButton()]
+            components: [
+                libraryBackButton()
+            ]
         });
-
 
     } catch (error) {
 
         console.error(
-            "Suggestions error:",
+            "❌ Suggestions error:",
             error
         );
 
-        await interaction.editReply(
+        await safeEditReply(
+            interaction,
             "❌ Couldn't load suggestions."
         );
 
@@ -1038,7 +1166,6 @@ async function showRatings(interaction) {
 
         await interaction.deferReply();
 
-
         const [movies] =
             await db.query(
                 `
@@ -1047,13 +1174,19 @@ async function showRatings(interaction) {
                     m.year,
                     m.poster,
                     r.rating
+
                 FROM ratings r
+
                 JOIN movies m
                     ON r.movie_id = m.id
+
                 WHERE r.user_id = ?
+
                 ORDER BY r.rated_at DESC
                 `,
-                [interaction.user.id]
+                [
+                    interaction.user.id
+                ]
             );
 
 
@@ -1081,7 +1214,9 @@ async function showRatings(interaction) {
 
         const embed =
             new EmbedBuilder()
-                .setTitle("⭐ My Movie Ratings")
+                .setTitle(
+                    `⭐ ${interaction.user.username}'s Ratings`
+                )
                 .setDescription(description)
                 .setFooter({
                     text:
@@ -1091,18 +1226,20 @@ async function showRatings(interaction) {
 
         await interaction.editReply({
             embeds: [embed],
-            components: [libraryBackButton()]
+            components: [
+                libraryBackButton()
+            ]
         });
-
 
     } catch (error) {
 
         console.error(
-            "Ratings error:",
+            "❌ Ratings error:",
             error
         );
 
-        await interaction.editReply(
+        await safeEditReply(
+            interaction,
             "❌ Couldn't load your ratings."
         );
 
@@ -1121,10 +1258,16 @@ function libraryBackButton() {
         .addComponents(
 
             new ButtonBuilder()
-                .setCustomId("library_back")
-                .setLabel("Back to Library")
+                .setCustomId(
+                    "library_back"
+                )
+                .setLabel(
+                    "Back to Library"
+                )
                 .setEmoji("🔙")
-                .setStyle(ButtonStyle.Secondary)
+                .setStyle(
+                    ButtonStyle.Secondary
+                )
 
         );
 
@@ -1137,6 +1280,10 @@ function libraryBackButton() {
 
 async function getOrCreateMovie(imdbId) {
 
+    // ==========================================
+    // CHECK DATABASE
+    // ==========================================
+
     const [existing] =
         await db.query(
             `
@@ -1144,7 +1291,9 @@ async function getOrCreateMovie(imdbId) {
             FROM movies
             WHERE imdb_id = ?
             `,
-            [imdbId]
+            [
+                imdbId
+            ]
         );
 
 
@@ -1155,15 +1304,25 @@ async function getOrCreateMovie(imdbId) {
     }
 
 
+    // ==========================================
+    // GET FROM OMDb
+    // ==========================================
+
     const response =
         await axios.get(
             "https://www.omdbapi.com/",
             {
                 params: {
+
                     apikey:
                         process.env.OMDB_API_KEY,
-                    i: imdbId,
-                    plot: "full"
+
+                    i:
+                        imdbId,
+
+                    plot:
+                        "full"
+
                 }
             }
         );
@@ -1184,6 +1343,10 @@ async function getOrCreateMovie(imdbId) {
     }
 
 
+    // ==========================================
+    // INSERT
+    // ==========================================
+
     await db.query(
         `
         INSERT INTO movies
@@ -1197,20 +1360,34 @@ async function getOrCreateMovie(imdbId) {
             imdb_rating,
             type
         )
+
         VALUES (?, ?, ?, ?, ?, ?, ?, ?)
         `,
         [
+
             movie.imdbID,
+
             movie.Title,
+
             movie.Year,
+
             movie.Poster,
+
             movie.Genre,
+
             movie.Plot,
+
             movie.imdbRating,
+
             movie.Type
+
         ]
     );
 
+
+    // ==========================================
+    // GET ID
+    // ==========================================
 
     const [rows] =
         await db.query(
@@ -1219,11 +1396,87 @@ async function getOrCreateMovie(imdbId) {
             FROM movies
             WHERE imdb_id = ?
             `,
-            [imdbId]
+            [
+                imdbId
+            ]
         );
 
 
+    if (rows.length === 0) {
+
+        throw new Error(
+            "Movie was inserted but ID could not be found."
+        );
+
+    }
+
+
     return rows[0].id;
+
+}
+
+
+// ==========================================
+// SEND OR EDIT
+// ==========================================
+
+async function sendOrEdit(
+    interaction,
+    payload
+) {
+
+    if (
+        interaction.deferred ||
+        interaction.replied
+    ) {
+
+        return interaction.editReply(
+            payload
+        );
+
+    }
+
+    return interaction.reply(
+        payload
+    );
+
+}
+
+
+// ==========================================
+// SAFE EDIT REPLY
+// ==========================================
+
+async function safeEditReply(
+    interaction,
+    content
+) {
+
+    try {
+
+        if (
+            interaction.deferred ||
+            interaction.replied
+        ) {
+
+            return interaction.editReply({
+                content
+            });
+
+        }
+
+        return interaction.reply({
+            content
+        });
+
+    } catch (error) {
+
+        console.error(
+            "❌ Failed to send interaction response:",
+            error
+        );
+
+    }
 
 }
 

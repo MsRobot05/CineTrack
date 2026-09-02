@@ -1,8 +1,4 @@
-
-
-
 require("dotenv").config();
-
 
 const { REST, Routes } = require("discord.js");
 
@@ -14,12 +10,9 @@ const askCommand = require("./commands/ask");
 const commands = [
     movieCommand.data.toJSON(),
     libraryCommand.data.toJSON(),
-
-     newMovieCommand.data.toJSON(),
-         askCommand.data.toJSON()
+    newMovieCommand.data.toJSON(),
+    askCommand.data.toJSON()
 ];
-
-
 
 const rest = new REST({ version: "10" }).setToken(
     process.env.DISCORD_TOKEN
@@ -27,7 +20,6 @@ const rest = new REST({ version: "10" }).setToken(
 
 (async () => {
     try {
-
         console.log("🔄 Registering commands...");
 
         await rest.put(
@@ -43,11 +35,10 @@ const rest = new REST({ version: "10" }).setToken(
         console.log("✅ /movie registered!");
         console.log("✅ /library registered!");
         console.log("✅ /newmovie registered!");
+        console.log("✅ /ask registered!");
 
     } catch (error) {
-
         console.error("❌ Registration failed:");
         console.error(error);
-
     }
 })();

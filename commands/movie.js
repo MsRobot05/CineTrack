@@ -29,6 +29,10 @@ module.exports = {
 
         try {
 
+            // ==========================================
+            // GET MOVIE FROM OMDb
+            // ==========================================
+
             const response = await axios.get(
                 "https://www.omdbapi.com/",
                 {
@@ -51,6 +55,11 @@ module.exports = {
                 );
             }
 
+
+            // ==========================================
+            // YOUTUBE TRAILER LINK
+            // ==========================================
+
             const trailerSearch =
                 encodeURIComponent(
                     `${movie.Title} ${movie.Year} official trailer`
@@ -59,56 +68,77 @@ module.exports = {
             const trailerURL =
                 `https://www.youtube.com/results?search_query=${trailerSearch}`;
 
-            const embed = new EmbedBuilder()
-                .setTitle(
-                    `🎬 ${movie.Title} (${movie.Year})`
-                )
-                .setDescription(
-                    movie.Plot ||
-                    "No description available."
-                )
-                .addFields(
 
-                    {
-                        name: "⭐ IMDb Rating",
-                        value:
-                            movie.imdbRating || "N/A",
-                        inline: true
-                    },
+            // ==========================================
+            // IMDb LINK
+            // ==========================================
 
-                    {
-                        name: "🎭 Genre",
-                        value:
-                            movie.Genre || "N/A",
-                        inline: true
-                    },
+            const imdbURL =
+                movie.imdbID
+                    ? `https://www.imdb.com/title/${movie.imdbID}/`
+                    : null;
 
-                    {
-                        name: "⏱️ Runtime",
-                        value:
-                            movie.Runtime || "N/A",
-                        inline: true
-                    },
 
-                    {
-                        name: "🎬 Director",
-                        value:
-                            movie.Director || "N/A",
-                        inline: true
-                    },
+            // ==========================================
+            // EMBED
+            // ==========================================
 
-                    {
-                        name: "👥 Cast",
-                        value:
-                            movie.Actors || "N/A",
-                        inline: false
-                    }
+            const embed =
+                new EmbedBuilder()
+                    .setTitle(
+                        `🎬 ${movie.Title} (${movie.Year})`
+                    )
+                    .setDescription(
+                        movie.Plot ||
+                        "No description available."
+                    )
+                    .addFields(
 
-                )
-                .setFooter({
-                    text:
-                        "CineTrack • Movie information powered by OMDb"
-                });
+                        {
+                            name: "⭐ IMDb Rating",
+                            value:
+                                movie.imdbRating || "N/A",
+                            inline: true
+                        },
+
+                        {
+                            name: "🎭 Genre",
+                            value:
+                                movie.Genre || "N/A",
+                            inline: true
+                        },
+
+                        {
+                            name: "⏱️ Runtime",
+                            value:
+                                movie.Runtime || "N/A",
+                            inline: true
+                        },
+
+                        {
+                            name: "🎬 Director",
+                            value:
+                                movie.Director || "N/A",
+                            inline: true
+                        },
+
+                        {
+                            name: "👥 Cast",
+                            value:
+                                movie.Actors || "N/A",
+                            inline: false
+                        }
+
+                    )
+                    .setFooter({
+                        text:
+                            "CineTrack • Movie information powered by OMDb"
+                    });
+
+
+            // ==========================================
+            // POSTER
+            // ==========================================
 
             if (
                 movie.Poster &&
@@ -119,9 +149,15 @@ module.exports = {
 
             }
 
+
+            // ==========================================
+            // BUTTONS
+            // ==========================================
+
             const buttons =
                 new ActionRowBuilder().addComponents(
 
+                    // WATCHED
                     new ButtonBuilder()
                         .setCustomId(
                             `watched_${movie.imdbID}`
@@ -132,6 +168,7 @@ module.exports = {
                             ButtonStyle.Success
                         ),
 
+                    // BUCKET LIST
                     new ButtonBuilder()
                         .setCustomId(
                             `watchlist_${movie.imdbID}`
@@ -142,6 +179,7 @@ module.exports = {
                             ButtonStyle.Primary
                         ),
 
+                    // RATE
                     new ButtonBuilder()
                         .setCustomId(
                             `rate_${movie.imdbID}`
@@ -152,6 +190,7 @@ module.exports = {
                             ButtonStyle.Secondary
                         ),
 
+                    // SUGGEST
                     new ButtonBuilder()
                         .setCustomId(
                             `suggest_${movie.imdbID}`
@@ -162,6 +201,7 @@ module.exports = {
                             ButtonStyle.Primary
                         ),
 
+                    // YOUTUBE TRAILER
                     new ButtonBuilder()
                         .setLabel("Trailer")
                         .setEmoji("▶️")
@@ -171,6 +211,11 @@ module.exports = {
                         .setURL(trailerURL)
 
                 );
+
+
+            // ==========================================
+            // SEND
+            // ==========================================
 
             await interaction.editReply({
 
