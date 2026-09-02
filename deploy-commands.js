@@ -6,12 +6,14 @@ const movieCommand = require("./commands/movie");
 const libraryCommand = require("./commands/library");
 const newMovieCommand = require("./commands/newmovie");
 const askCommand = require("./commands/ask");
+const helpCommand = require("./commands/help");
 
 const commands = [
     movieCommand.data.toJSON(),
     libraryCommand.data.toJSON(),
     newMovieCommand.data.toJSON(),
-    askCommand.data.toJSON()
+    askCommand.data.toJSON(),
+    helpCommand.data.toJSON()
 ];
 
 const rest = new REST({ version: "10" }).setToken(
@@ -20,6 +22,7 @@ const rest = new REST({ version: "10" }).setToken(
 
 (async () => {
     try {
+
         console.log("🔄 Registering commands...");
 
         await rest.put(
@@ -36,9 +39,12 @@ const rest = new REST({ version: "10" }).setToken(
         console.log("✅ /library registered!");
         console.log("✅ /newmovie registered!");
         console.log("✅ /ask registered!");
+        console.log("✅ /help registered!");
 
     } catch (error) {
+
         console.error("❌ Registration failed:");
         console.error(error);
+
     }
 })();

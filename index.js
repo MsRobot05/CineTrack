@@ -6,6 +6,7 @@ const movieCommand = require("./commands/movie");
 const libraryCommand = require("./commands/library");
 const newMovieCommand = require("./commands/newmovie");
 const askCommand = require("./commands/ask");
+const helpCommand = require("./commands/help");
 
 const {
     startNewMovieDrops
@@ -60,6 +61,10 @@ client.commands.set(
 client.commands.set(
     askCommand.data.name,
     askCommand
+);
+client.commands.set(
+    helpCommand.data.name,
+    helpCommand
 );
 
 
